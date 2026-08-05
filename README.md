@@ -17,18 +17,20 @@ This crop-then-classify design keeps the model simple to train while matching ex
 
 ## Dataset
 
-**[PKLot](https://public.roboflow.ai/object-detection/pklot)** — 12,416 images of parking lots across 3 locations (PUC, UFPR04, UFPR05) under sunny, cloudy, and rainy conditions, sourced via a Roboflow COCO-format export (object detection annotations, not pre-cropped).
+**PKLot** — parking lots across 3 locations (PUC, UFPR04, UFPR05) under sunny, cloudy, and rainy conditions. Sourced via a [Kaggle mirror](https://www.kaggle.com/datasets/ammarnassanalhajali/pklot-dataset) of the original PKLot dataset, exported in COCO object-detection format — 12,416 full parking-lot images, each annotated with bounding boxes for every individual parking space visible in the frame, rather than pre-cropped classification images.
 
-Since the raw dataset provides full lot images with bounding-box annotations rather than pre-cropped classification data, a preprocessing script (`src/data/prepare_split.py`) parses the COCO annotations and extracts individual space crops, sorted by label:
+A preprocessing step (`src/data/prepare_split.py`) parses these COCO annotations and extracts each individual annotated space as its own cropped image, sorted by label:
 
 ```
 data/processed/{train,valid,test}/{Empty,Occupied}/
 ```
 
+This produces several hundred thousand individual space-level crops across the three splits — this cropped data, not the original 12,416 full-lot images, is what's actually used for training and evaluation.
+
 | Split | Empty | Occupied | Total |
 |-------|-------|----------|-------|
 | Train (subsampled) | 15,000 | 15,000 | 30,000 |
-| Valid | 73,629 | 68,687 | 143,316 |
+| Valid | 73,629 | 69,687 | 143,316 |
 | Test | 36,584 | 34,100 | 70,684 |
 
 Training was run on a balanced 30,000-image subsample of the full ~500,000-image train split, to keep iteration fast during development. Validation and test sets were used in full, untouched.
@@ -41,7 +43,7 @@ Training was run on a balanced 30,000-image subsample of the full ~500,000-image
 - **Input:** 128×128 RGB crops, normalized with standard ImageNet statistics
 - **Loss:** Cross Entropy Loss
 - **Optimizer:** Adam, lr=0.001
-- **Training:** 10 epochs, batch size 32, best checkpoint selected by validation loss
+- **Training:** 5 epochs, batch size 32, best checkpoint selected by validation loss
 
 ## Results
 
@@ -55,20 +57,32 @@ Training was run on a balanced 30,000-image subsample of the full ~500,000-image
 ### Training vs. Validation Loss
 ![Loss Curve](assets/loss_curve.png)
 
+Both curves drop sharply in the first epoch and stay close together throughout training, without validation loss diverging upward — a sign the model is learning genuine patterns rather than memorizing the training subsample. The best-performing epoch (lowest validation loss) is the one saved as the final checkpoint.
+
 ### Confusion Matrix
 ![Confusion Matrix](assets/confusion_matrix.png)
+
+Rows are the true label, columns are the predicted label. The diagonal (top-left to bottom-right) represents correct predictions; the off-diagonal cells are errors. Notably, false negatives (predicting Empty when a space is actually Occupied) are lower than false positives — the more forgiving direction to err in for this use case, since sending a driver to a spot that's actually taken is a worse outcome than missing a genuinely open one.
 
 ### Per-Class Metrics
 ![Per-Class Metrics](assets/per_class_metrics.png)
 
+Precision, recall, and F1-score for each class, side by side. Both classes score similarly (~0.94-0.96 across all three metrics), indicating the model isn't biased toward favoring one class over the other.
+
 ### Class Distribution Across Splits
 ![Class Distribution](assets/class_distribution.png)
+
+Confirms class balance across train, validation, and test sets. Train was deliberately subsampled to an even 15,000/15,000 split; validation and test were left at their natural (still roughly balanced) sizes.
 
 ### Sample Predictions
 ![Prediction Samples](assets/prediction_samples.png)
 
+25 randomly sampled test images with the model's prediction and the true label. Green titles are correct predictions, red are incorrect — a quick visual sense of what the model gets right (and how confidently) on typical examples.
+
 ### Misclassified Examples
 ![Misclassified Samples](assets/misclassified_samples.png)
+
+25 randomly sampled *incorrect* predictions only. Reviewing these is useful for understanding failure modes — e.g., whether errors cluster around specific lighting conditions, partial occlusion, or ambiguous crops — and for identifying what a future fine-tuning pass should target.
 
 ## Project Structure
 
@@ -123,3 +137,4 @@ Almeida, P., Oliveira, L. S., Silva Jr, E., Britto Jr, A., Koerich, A.,
 PKLot – A robust dataset for parking lot classification,
 Expert Systems with Applications, 42(11):4937-4949, 2015.
 ```
+
