@@ -107,21 +107,69 @@ smart-parking/
 └── assets/                     # generated charts for this README
 ```
 
+## Setup
+
+**1. Clone the repo and create a virtual environment**
+```bash
+git clone https://github.com/SheikhMazin/parking-occupancy-classifier.git
+cd parking-occupancy-classifier
+python -m venv venv
+source venv/bin/activate   # on Windows: venv\Scripts\activate
+```
+
+**2. Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+If you're on a different CUDA version (or CPU-only), the PyTorch line in `requirements.txt` may need to be swapped for the right build from the selector at [pytorch.org/get-started/locally](https://pytorch.org/get-started/locally) before installing the rest.
+
+**3. Download the dataset**
+Get the PKLot dataset from its [Kaggle page](https://www.kaggle.com/datasets/ammarnassanalhajali/pklot-dataset) (requires a free Kaggle account). Either download the `.zip` manually from the page, or use `kagglehub`:
+```python
+import kagglehub
+path = kagglehub.dataset_download("ammarnassanalhajali/pklot-dataset")
+print(path)
+```
+
+**4. Place the dataset in the project**
+Copy (or move) the downloaded dataset so its contents land at:
+```
+data/raw/PKLot/versions/1/{train,valid,test}/
+```
+Each of `train`, `valid`, and `test` should contain the image files plus an `_annotations.coco.json` file. This exact path is what `src/data/prepare_split.py` expects — if your download extracts to a different folder name/depth, adjust the paths at the top of `prepare_split.py` to match.
+
+**5. Create the checkpoints folder** (or let it get created automatically — `train.py` does this on its own via `os.makedirs`)
+```bash
+mkdir -p checkpoints
+```
+
 ## Running It
+
+Run these in order, from the project root:
 
 ```bash
 # 1. Extract labeled crops from raw COCO annotations
+#    (reads data/raw/PKLot/..., writes to data/processed/{train,valid,test}/{Empty,Occupied}/)
 python src/data/prepare_split.py
 
 # 2. Train the model
+#    (reads data/processed/, writes checkpoints/best_model.pth + checkpoints/training_history.pth)
 python -m src.training.train
 
 # 3. Evaluate on the held-out test set
+#    (loads checkpoints/best_model.pth, writes checkpoints/test_results.pth, prints metrics)
 python -m src.evaluation.evaluate
 
 # 4. Generate charts
+#    (reads checkpoints/training_history.pth + checkpoints/test_results.pth, writes assets/*.png)
 python -m src.evaluation.make_visuals
 ```
+
+**Notes:**
+- Step 1 only needs to be run once — after that, `data/processed/` has everything training needs.
+- Steps 2-4 must run in that order, since each depends on files the previous step produced.
+- Re-running step 2 will overwrite `checkpoints/best_model.pth` with a fresh training run — back it up first if you want to keep a previous result.
+- All commands assume you're running from the project root with the virtual environment activated, and that `src/`, `src/data/`, `src/models/`, and `src/training/` each contain an (empty) `__init__.py` file.
 
 ## Known Limitations & Next Steps
 
@@ -137,4 +185,3 @@ Almeida, P., Oliveira, L. S., Silva Jr, E., Britto Jr, A., Koerich, A.,
 PKLot – A robust dataset for parking lot classification,
 Expert Systems with Applications, 42(11):4937-4949, 2015.
 ```
-
