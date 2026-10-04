@@ -82,7 +82,7 @@ Confirms class balance across train, validation, and test sets. Train was delibe
 ### Misclassified Examples
 ![Misclassified Samples](assets/misclassified_samples.png)
 
-25 randomly sampled *incorrect* predictions only. Reviewing these is useful for understanding failure modes — e.g., whether errors cluster around specific lighting conditions, partial occlusion, or ambiguous crops — and for identifying what a future fine-tuning pass should target.
+25 randomly sampled *incorrect* predictions only. Many of these look like dataset problems rather than model mistakes. Several crops show a clearly visible car labeled Empty, and at least one shows bare pavement labeled Occupied. Other crops are mostly empty space with part of a neighboring car in the corner, because the dataset's original rotated annotations were converted to axis-aligned boxes. Reported accuracy is probably conservative as a result, though this hasn't been measured.
 
 ## Project Structure
 
@@ -173,6 +173,7 @@ python -m src.evaluation.make_visuals
 
 ## Known Limitations & Next Steps
 
+- **Some test errors look like label noise.** A visual check of misclassified samples suggests a share of the "errors" are mislabeled or poorly cropped examples, not real misses. The size of that share hasn't been measured yet. Manually reviewing a few hundred errors and counting would give a cleaner estimate of true accuracy.
 - **Cross-domain generalization is untested.** The model has only been trained and evaluated on PKLot's own camera angles and lots. Performance on a genuinely new camera setup (different angle, height, lighting) is unverified — the natural next step is fine-tuning on a small hand-labeled sample from a different lot.
 - **Space localization is manual.** This project assumes bounding boxes for each space are known ahead of time (provided by the dataset, or defined once per fixed camera in a real deployment). It does not include a space-detection model.
 - **Per-space inference doesn't scale to city-level deployments without batching.** At the scale of a single university or parking structure, batched inference on a lightweight classifier like this is fast enough (low seconds for thousands of spaces). At true city scale, a single-pass object detector would likely be a better architectural choice.
